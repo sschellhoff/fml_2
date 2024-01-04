@@ -8,6 +8,13 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import qualified Control.Monad.Combinators.Expr as CE
+import qualified Ast
+import qualified Ast
+import qualified Ast
+import qualified Ast
+import qualified Ast
+import qualified Ast
+import qualified Ast
 
 type Parser = Parsec Void Text
 
@@ -39,7 +46,7 @@ parseKeyword :: Text -> Parser Text
 parseKeyword keyword = lexeme (string keyword <* notFollowedBy alphaNumChar)
 
 reservedWords :: [String]
-reservedWords = ["const", "let"]
+reservedWords = ["const", "let", "while", "true", "false"]
 
 parseIdentifier :: Parser String
 parseIdentifier = (lexeme . try) (p >>= check)
@@ -61,10 +68,22 @@ parseFloatConst = Ast.FloatConst () <$> lexeme L.float
 parseNumberConst :: Parser Ast.ParsedExpr
 parseNumberConst = try parseFloatConst <|> parseIntConst
 
+parseBooleanConst :: Parser Ast.ParsedExpr
+parseBooleanConst = do
+    value <- parseKeyword "true" <|> parseKeyword "false"
+    return (Ast.BoolConst () (value == "true"))
+
+parseVariable :: Parser Ast.ParsedExpr
+parseVariable = do
+    name <- parseIdentifier
+    return (Ast.Var () name)
+
 parseTerm :: Parser Ast.ParsedExpr
 parseTerm = choice
     [ parens parseExpr
     , parseNumberConst
+    , parseBooleanConst
+    , parseVariable
     ]
 
 binary :: Text -> (Ast.ParsedExpr -> Ast.ParsedExpr -> Ast.ParsedExpr) -> CE.Operator Parser Ast.ParsedExpr
@@ -88,6 +107,18 @@ operatorTable =
   , [ binary "+" (Ast.toParsedInfixExpr Ast.InfixAdd)
     , binary "-" (Ast.toParsedInfixExpr Ast.InfixSub)
     ]
+  , [ binary "<" (Ast.toParsedInfixExpr Ast.InfixLt)
+    , binary ">" (Ast.toParsedInfixExpr Ast.InfixGt)   
+    , binary ">=" (Ast.toParsedInfixExpr Ast.InfixGe) 
+    , binary "<=" (Ast.toParsedInfixExpr Ast.InfixLe) 
+    ] 
+  , [ binary "==" (Ast.toParsedInfixExpr Ast.InfixEq)
+    , binary "!=" (Ast.toParsedInfixExpr Ast.InfixNeq)
+    ]
+  , [ binary "&&" (Ast.toParsedInfixExpr Ast.InfixAnd)
+    ]
+  , [ binary "||" (Ast.toParsedInfixExpr Ast.InfixOr)
+    ]
   ]
 
 parseExpr :: Parser Ast.ParsedExpr
@@ -95,8 +126,9 @@ parseExpr = CE.makeExprParser parseTerm operatorTable
 
 parseStmt :: Parser Ast.ParsedAst
 parseStmt = choice
-    [ parseConstStmt
-    , parseAssignStmt
+    [ parseWhileStmt
+    , parseConstStmt
+    , try parseAssignStmt
     , parseLetStmt
     , parseExprStmt
     ]
@@ -128,6 +160,21 @@ parseExprStmt :: Parser Ast.ParsedAst
 parseExprStmt = do
     expr <- parseExpr
     return (Ast.ExprStmt () expr)
+
+parseStmts :: Parser [Ast.ParsedAst]
+parseStmts = many parseStmt
+
+parseBlock :: Parser [Ast.ParsedAst]
+parseBlock = do
+    stmts <- between (symbol "{") (symbol "}") parseStmts
+    return (stmts)
+
+parseWhileStmt :: Parser Ast.ParsedAst
+parseWhileStmt = do
+    _ <- parseKeyword "while"
+    condition <- parseExpr
+    block <- parseBlock
+    return (Ast.While () condition block)
 
 parseFile content = parseTest (parseStmt <* eof) (pack content) -- TODO read fileinput and parse the content
 
