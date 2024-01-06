@@ -50,10 +50,24 @@ addTypeExpr :: Ast.ParsedExpr -> TypedExpr
 addTypeExpr (Ast.IntConst pi value) = Ast.IntConst (TypeInfo (Primitive FmlInt64) pi) value
 addTypeExpr (Ast.BoolConst pi value) = Ast.BoolConst (TypeInfo (Primitive FmlBoolean) pi) value
 addTypeExpr (Ast.FloatConst pi value) = Ast.FloatConst (TypeInfo (Primitive FmlFloat64) pi) value
-addTypeExpr (Ast.InfixExpr pi lhs op rhs) = Ast.InfixExpr t tlhs op trhs where
+addTypeExpr (Ast.InfixExpr pi lhs op rhs) = Ast.InfixExpr (TypeInfo t pi) tlhs op trhs where
     tlhs = addTypeExpr lhs
     trhs = addTypeExpr rhs
-    t = getMetaExpr tlhs -- TODO check operator and infer type
+    typeOfLhs = getExprType tlhs
+    t = case op of
+        Ast.InfixAdd -> typeOfLhs
+        Ast.InfixSub -> typeOfLhs
+        Ast.InfixMult -> typeOfLhs
+        Ast.InfixDiv -> typeOfLhs
+        Ast.InfixMod -> typeOfLhs
+        Ast.InfixEq -> Primitive FmlBoolean
+        Ast.InfixNeq -> Primitive FmlBoolean
+        Ast.InfixLt -> Primitive FmlBoolean
+        Ast.InfixGt -> Primitive FmlBoolean
+        Ast.InfixLe -> Primitive FmlBoolean
+        Ast.InfixGe -> Primitive FmlBoolean
+        Ast.InfixAnd -> Primitive FmlBoolean
+        Ast.InfixOr -> Primitive FmlBoolean
 addTypeExpr (Ast.PrefixExpr _ op rhs) = Ast.PrefixExpr t op trhs where
     trhs = addTypeExpr rhs
     t = getMetaExpr trhs
