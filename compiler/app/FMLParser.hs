@@ -173,6 +173,12 @@ parseWhileStmt = do
     condition <- parseExpr
     Ast.While (makeParseInfo pos) condition <$> parseBlock
 
+parseProgram :: String -> Parser Ast.ParsedProgram
+parseProgram filename = Ast.FmlCode (Ast.ParseInfo 0 filename) <$> parseStmts
+
+parseContent :: String -> String -> Either (ParseErrorBundle Text Void) Ast.ParsedProgram
+parseContent filename content = runParser (parseProgram filename <* eof) filename (pack content)
+
 parseFile content = parseTest (parseStmt <* eof) (pack content) -- TODO read fileinput and parse the content
 
 test :: IO ()

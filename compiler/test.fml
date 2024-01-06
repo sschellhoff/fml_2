@@ -1,0 +1,4 @@
+const a = 1337
+while a > 0 {
+    a = a - 1
+}

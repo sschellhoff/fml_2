@@ -1,5 +1,6 @@
 module Ast where
 
+type ParsedProgram = Program ParseInfo
 type ParsedAst = Ast ParseInfo
 type ParsedExpr = Expr ParseInfo
 
@@ -13,6 +14,9 @@ data ParseInfo = ParseInfo
 
 makeParseInfo :: Int -> ParseInfo
 makeParseInfo pos = ParseInfo pos "something"
+
+data Program meta = FmlCode meta [Ast meta]
+    deriving (Show)
 
 data Ast meta
     = ConstDecl meta String (Expr meta)
@@ -30,6 +34,9 @@ data Expr meta
     | PrefixExpr meta PrefixOp (Expr meta)
     | Var meta String
     deriving (Show)
+
+getMetaProg :: Program meta -> meta
+getMetaProg (FmlCode m _) = m
 
 getMetaAst :: Ast meta -> meta
 getMetaAst (ConstDecl m _ _) = m
