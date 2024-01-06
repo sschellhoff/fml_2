@@ -8,13 +8,7 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import qualified Control.Monad.Combinators.Expr as CE
-import qualified Ast
-import qualified Ast
-import qualified Ast
-import qualified Ast
-import qualified Ast
-import qualified Ast
-import qualified Ast
+import Text.ParserCombinators.ReadP (get)
 
 type Parser = Parsec Void Text
 
@@ -60,23 +54,28 @@ parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
 parseIntConst :: Parser Ast.ParsedExpr
-parseIntConst = Ast.IntConst () <$> lexeme L.decimal
+parseIntConst = do
+  pos <- getOffset
+  Ast.IntConst (makeParseInfo pos) <$> lexeme L.decimal
 
 parseFloatConst :: Parser Ast.ParsedExpr
-parseFloatConst = Ast.FloatConst () <$> lexeme L.float
+parseFloatConst = do
+  pos <- getOffset
+  Ast.FloatConst (makeParseInfo pos) <$> lexeme L.float
 
 parseNumberConst :: Parser Ast.ParsedExpr
 parseNumberConst = try parseFloatConst <|> parseIntConst
 
 parseBooleanConst :: Parser Ast.ParsedExpr
 parseBooleanConst = do
+    pos <- getOffset
     value <- parseKeyword "true" <|> parseKeyword "false"
-    return (Ast.BoolConst () (value == "true"))
+    return (Ast.BoolConst (makeParseInfo pos) (value == "true"))
 
 parseVariable :: Parser Ast.ParsedExpr
 parseVariable = do
-    name <- parseIdentifier
-    return (Ast.Var () name)
+    pos <- getOffset
+    Ast.Var (makeParseInfo pos) <$> parseIdentifier
 
 parseTerm :: Parser Ast.ParsedExpr
 parseTerm = choice
@@ -93,31 +92,31 @@ prefix, postfix :: Text -> (Ast.ParsedExpr -> Ast.ParsedExpr) -> CE.Operator Par
 prefix  name f = CE.Prefix  (f <$ symbol name)
 postfix name f = CE.Postfix (f <$ symbol name)
 
-operatorTable :: [[CE.Operator Parser Ast.ParsedExpr]]
+operatorTable :: [[CE.Operator Parser Ast.ParsedExpr]] -- TODO parsePosition is invalid
 operatorTable =
-  [ [ prefix "-" (Ast.toParsedPrefixExpr Ast.OpNeg)
-    , prefix "!" (Ast.toParsedPrefixExpr Ast.OpNot)
+  [ [ prefix "-" (Ast.toParsedPrefixExpr Ast.OpNeg (makeParseInfo 0))
+    , prefix "!" (Ast.toParsedPrefixExpr Ast.OpNot (makeParseInfo 0))
     , prefix "+" id
     ]
 
-  , [ binary "*" (Ast.toParsedInfixExpr Ast.InfixMult)
-    , binary "/" (Ast.toParsedInfixExpr Ast.InfixDiv)
-    , binary "%" (Ast.toParsedInfixExpr Ast.InfixMod)
+  , [ binary "*" (Ast.toParsedInfixExpr Ast.InfixMult (makeParseInfo 0))
+    , binary "/" (Ast.toParsedInfixExpr Ast.InfixDiv (makeParseInfo 0))
+    , binary "%" (Ast.toParsedInfixExpr Ast.InfixMod (makeParseInfo 0))
     ]
-  , [ binary "+" (Ast.toParsedInfixExpr Ast.InfixAdd)
-    , binary "-" (Ast.toParsedInfixExpr Ast.InfixSub)
+  , [ binary "+" (Ast.toParsedInfixExpr Ast.InfixAdd (makeParseInfo 0))
+    , binary "-" (Ast.toParsedInfixExpr Ast.InfixSub (makeParseInfo 0))
     ]
-  , [ binary "<" (Ast.toParsedInfixExpr Ast.InfixLt)
-    , binary ">" (Ast.toParsedInfixExpr Ast.InfixGt)   
-    , binary ">=" (Ast.toParsedInfixExpr Ast.InfixGe) 
-    , binary "<=" (Ast.toParsedInfixExpr Ast.InfixLe) 
+  , [ binary "<" (Ast.toParsedInfixExpr Ast.InfixLt (makeParseInfo 0))
+    , binary ">" (Ast.toParsedInfixExpr Ast.InfixGt (makeParseInfo 0))   
+    , binary ">=" (Ast.toParsedInfixExpr Ast.InfixGe (makeParseInfo 0)) 
+    , binary "<=" (Ast.toParsedInfixExpr Ast.InfixLe (makeParseInfo 0)) 
     ] 
-  , [ binary "==" (Ast.toParsedInfixExpr Ast.InfixEq)
-    , binary "!=" (Ast.toParsedInfixExpr Ast.InfixNeq)
+  , [ binary "==" (Ast.toParsedInfixExpr Ast.InfixEq (makeParseInfo 0))
+    , binary "!=" (Ast.toParsedInfixExpr Ast.InfixNeq (makeParseInfo 0))
     ]
-  , [ binary "&&" (Ast.toParsedInfixExpr Ast.InfixAnd)
+  , [ binary "&&" (Ast.toParsedInfixExpr Ast.InfixAnd (makeParseInfo 0))
     ]
-  , [ binary "||" (Ast.toParsedInfixExpr Ast.InfixOr)
+  , [ binary "||" (Ast.toParsedInfixExpr Ast.InfixOr (makeParseInfo 0))
     ]
   ]
 
@@ -135,46 +134,44 @@ parseStmt = choice
 
 parseConstStmt :: Parser Ast.ParsedAst
 parseConstStmt = do
+    pos <- getOffset
     _ <- parseKeyword "const"
     name <- parseIdentifier
     _ <- symbol "="
-    expr <- parseExpr
-    return (Ast.ConstDecl () name expr)
+    Ast.ConstDecl (makeParseInfo pos) name <$> parseExpr
 
 parseAssignStmt :: Parser Ast.ParsedAst
 parseAssignStmt = do
+    pos <- getOffset
     name <- parseIdentifier
     _ <- symbol "="
-    expr <- parseExpr
-    return (Ast.Assign () name expr)
+    Ast.Assign (makeParseInfo pos) name <$> parseExpr
 
 parseLetStmt :: Parser Ast.ParsedAst
 parseLetStmt = do
+    pos <- getOffset
     _ <- parseKeyword "let"
     name <- parseIdentifier
     _ <- symbol "="
-    expr <- parseExpr
-    return (Ast.ConstDecl () name expr)
+    Ast.ConstDecl (makeParseInfo pos) name <$> parseExpr
 
 parseExprStmt :: Parser Ast.ParsedAst
 parseExprStmt = do
-    expr <- parseExpr
-    return (Ast.ExprStmt () expr)
+    pos <- getOffset
+    Ast.ExprStmt (makeParseInfo pos) <$> parseExpr
 
 parseStmts :: Parser [Ast.ParsedAst]
 parseStmts = many parseStmt
 
 parseBlock :: Parser [Ast.ParsedAst]
-parseBlock = do
-    stmts <- between (symbol "{") (symbol "}") parseStmts
-    return (stmts)
+parseBlock = between (symbol "{") (symbol "}") parseStmts
 
 parseWhileStmt :: Parser Ast.ParsedAst
 parseWhileStmt = do
+    pos <- getOffset
     _ <- parseKeyword "while"
     condition <- parseExpr
-    block <- parseBlock
-    return (Ast.While () condition block)
+    Ast.While (makeParseInfo pos) condition <$> parseBlock
 
 parseFile content = parseTest (parseStmt <* eof) (pack content) -- TODO read fileinput and parse the content
 
