@@ -12,6 +12,6 @@ runString filename content = typedAst where
     ast = FMLParser.parseContent filename content
     typedAst = fmap TypeInference.addTypeProgram ast
 
---runFile :: String -> Either a [Ast.ParsedAst]
+runFile :: String -> IO (Either (ParseErrorBundle Text Void) TypedProgram)
 runFile filename = do
     runString filename <$> readFile filename

@@ -6,6 +6,6 @@ main = do
     filename <- getLine
     result <- Frontend.runFile filename
     case result of
-        Left s -> putStrLn ("Left " ++ show s)
+        Left s -> putStrLn ("Error " ++ show s)
         Right s -> do
-             putStrLn ("Right (IO " ++ show s ++ ")")
+             print s
