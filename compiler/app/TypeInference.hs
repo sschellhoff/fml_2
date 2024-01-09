@@ -1,13 +1,11 @@
 module TypeInference where
 
 import Ast
-import Foreign.C (throwErrnoIfRetryMayBlock)
-
-data PrimitiveType = FmlBoolean | FmlInt64 | FmlFloat64
-    deriving (Show)
-
-data FmlType = Primitive PrimitiveType | Unit
-    deriving (Show)
+import FmlError
+import Environment
+import Control.Monad.Trans.Except
+import Control.Monad.State
+import FmlType
 
 data TypeInfo = TypeInfo
     { typeInfo :: FmlType
@@ -18,57 +16,77 @@ data TypeInfo = TypeInfo
 type TypedProgram = Ast.Program TypeInfo
 type TypedAst = Ast.Ast TypeInfo
 type TypedExpr = Ast.Expr TypeInfo
+type FmlSemanticStep f t = f -> ExceptT FmlError (State Environment) t
 
 getExprType :: TypedExpr -> FmlType
 getExprType texpr = typeInfo $ getMetaExpr texpr
 
-addTypes :: [Ast.ParsedAst] -> [TypedAst]
-addTypes = map addTypeAst
+addTypeProgramOrFail :: FmlSemanticStep Ast.ParsedProgram TypedProgram
+addTypeProgramOrFail (Ast.FmlCode parseInfi stmts) = do
+    tStmts <- addTypesOrFail stmts
+    return $ Ast.FmlCode (TypeInfo Unit parseInfi) tStmts
 
-addTypeProgram :: Ast.ParsedProgram -> TypedProgram
-addTypeProgram (Ast.FmlCode pi stmts) = Ast.FmlCode (TypeInfo Unit pi) $ addTypes stmts
+addTypesOrFail :: FmlSemanticStep [Ast.ParsedAst] [TypedAst]
+addTypesOrFail = mapM addTypeAstOrFail
 
-addTypeAst :: Ast.ParsedAst -> TypedAst
-addTypeAst (Ast.ConstDecl pi name expr) = Ast.ConstDecl (TypeInfo t pi) name texpr where
-    texpr = addTypeExpr expr
-    t = getExprType texpr
-addTypeAst (Ast.Let pi name expr) = Ast.Let (TypeInfo t pi) name texpr where
-    texpr = addTypeExpr expr
-    t = getExprType texpr
-addTypeAst (Ast.Assign pi name expr) = Ast.Assign (TypeInfo t pi) name texpr where -- TODO lookup type
-    texpr = addTypeExpr expr
-    t = getExprType texpr
-addTypeAst (Ast.While pi condition block) = Ast.While (TypeInfo t pi) tcondition tblock where
-    tcondition = addTypeExpr condition
-    tblock = map addTypeAst block
-    t = Unit
-addTypeAst (Ast.ExprStmt pi expr) = Ast.ExprStmt (TypeInfo t pi) texpr where
-    texpr = addTypeExpr expr
-    t = Unit
+addTypeAstOrFail :: FmlSemanticStep Ast.ParsedAst TypedAst
+addTypeAstOrFail (Ast.ConstDecl parseInfi name expr) = do
+    texpr <- addTypeExprOrFail expr
+    let t = getExprType texpr
+    lift $ setInEnv name t
+    return $ Ast.ConstDecl (TypeInfo t parseInfi) name texpr where
+addTypeAstOrFail (Ast.Let parseInfi name expr) = do
+    texpr <- addTypeExprOrFail expr
+    let t = getExprType texpr
+    lift $ setInEnv name t
+    return $ Ast.Let (TypeInfo t parseInfi) name texpr
+addTypeAstOrFail (Ast.Assign parseInfi name expr) = do
+    texpr <- addTypeExprOrFail expr
+    let t = getExprType texpr
+    return $ Ast.Assign (TypeInfo t parseInfi) name texpr
+addTypeAstOrFail (Ast.While parseInfi condition block) = do
+    tcondition <- addTypeExprOrFail condition
+    tblock <- mapM addTypeAstOrFail block
+    let t = Unit
+    return $ Ast.While (TypeInfo t parseInfi) tcondition tblock
+addTypeAstOrFail (Ast.ExprStmt parseInfi expr) = do
+    texpr <- addTypeExprOrFail expr
+    let t = Unit
+    return $ Ast.ExprStmt (TypeInfo t parseInfi) texpr
 
-addTypeExpr :: Ast.ParsedExpr -> TypedExpr
-addTypeExpr (Ast.IntConst pi value) = Ast.IntConst (TypeInfo (Primitive FmlInt64) pi) value
-addTypeExpr (Ast.BoolConst pi value) = Ast.BoolConst (TypeInfo (Primitive FmlBoolean) pi) value
-addTypeExpr (Ast.FloatConst pi value) = Ast.FloatConst (TypeInfo (Primitive FmlFloat64) pi) value
-addTypeExpr (Ast.InfixExpr pi lhs op rhs) = Ast.InfixExpr (TypeInfo t pi) tlhs op trhs where
-    tlhs = addTypeExpr lhs
-    trhs = addTypeExpr rhs
-    typeOfLhs = getExprType tlhs
-    t = case op of
-        Ast.InfixAdd -> typeOfLhs
-        Ast.InfixSub -> typeOfLhs
-        Ast.InfixMult -> typeOfLhs
-        Ast.InfixDiv -> typeOfLhs
-        Ast.InfixMod -> typeOfLhs
-        Ast.InfixEq -> Primitive FmlBoolean
-        Ast.InfixNeq -> Primitive FmlBoolean
-        Ast.InfixLt -> Primitive FmlBoolean
-        Ast.InfixGt -> Primitive FmlBoolean
-        Ast.InfixLe -> Primitive FmlBoolean
-        Ast.InfixGe -> Primitive FmlBoolean
-        Ast.InfixAnd -> Primitive FmlBoolean
-        Ast.InfixOr -> Primitive FmlBoolean
-addTypeExpr (Ast.PrefixExpr _ op rhs) = Ast.PrefixExpr t op trhs where
-    trhs = addTypeExpr rhs
-    t = getMetaExpr trhs
-addTypeExpr (Ast.Var pi name) = Ast.Var (TypeInfo  (Primitive FmlInt64) pi) name -- TODO look up type
+addTypeExprOrFail :: FmlSemanticStep Ast.ParsedExpr TypedExpr
+addTypeExprOrFail (Ast.IntConst parseInfi value) = do
+    return $ Ast.IntConst (TypeInfo (Primitive FmlInt64) parseInfi) value
+addTypeExprOrFail (Ast.BoolConst parseInfi value) = do
+    return $ Ast.BoolConst (TypeInfo (Primitive FmlBoolean) parseInfi) value
+addTypeExprOrFail (Ast.FloatConst parseInfi value) = do
+    return $ Ast.FloatConst (TypeInfo (Primitive FmlFloat64) parseInfi) value
+addTypeExprOrFail (Ast.PrefixExpr _ op rhs) = do
+    trhs <- addTypeExprOrFail rhs
+    let t = getMetaExpr trhs
+    return $ Ast.PrefixExpr t op trhs
+addTypeExprOrFail (Ast.Var parseInfi name) = do
+    t <- getInEnvOrFail name (FmlError.VarNotDef name parseInfi)
+    return $ Ast.Var (TypeInfo t parseInfi) name
+addTypeExprOrFail (Ast.InfixExpr parseInfi lhs op rhs) = do
+    tlhs <- addTypeExprOrFail lhs
+    trhs <- addTypeExprOrFail rhs
+    let typeOfLhs = getExprType tlhs
+    let t = getInfixOpType typeOfLhs op
+    return $ Ast.InfixExpr (TypeInfo t parseInfi) tlhs op trhs
+
+getInfixOpType :: FmlType -> InfixOp -> FmlType
+getInfixOpType operandType op = case op of
+    Ast.InfixAdd -> operandType
+    Ast.InfixSub -> operandType
+    Ast.InfixMult -> operandType
+    Ast.InfixDiv -> operandType
+    Ast.InfixMod -> operandType
+    Ast.InfixEq -> Primitive FmlBoolean
+    Ast.InfixNeq -> Primitive FmlBoolean
+    Ast.InfixLt -> Primitive FmlBoolean
+    Ast.InfixGt -> Primitive FmlBoolean
+    Ast.InfixLe -> Primitive FmlBoolean
+    Ast.InfixGe -> Primitive FmlBoolean
+    Ast.InfixAnd -> Primitive FmlBoolean
+    Ast.InfixOr -> Primitive FmlBoolean

@@ -8,7 +8,7 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import qualified Control.Monad.Combinators.Expr as CE
-import Text.ParserCombinators.ReadP (get)
+import FmlError
 
 type Parser = Parsec Void Text
 
@@ -179,12 +179,9 @@ parseProgram filename = Ast.FmlCode (Ast.ParseInfo 0 filename) <$> parseStmts
 parseContent :: String -> String -> Either (ParseErrorBundle Text Void) Ast.ParsedProgram
 parseContent filename content = runParser (parseProgram filename <* eof) filename (pack content)
 
-parseFile content = parseTest (parseStmt <* eof) (pack content) -- TODO read fileinput and parse the content
-
-test :: IO ()
-test = do
-    parseTest (parseExpr <* eof) "1 + 2 * 3"
-    parseTest (parseStmt <* eof) "const a = 13 + 37"
-    parseTest (parseStmt <* eof) "let b = 13 + 37"
-    parseTest (parseStmt <* eof) "b = 42"
-    parseTest (parseStmt <* eof) "13 * 37 + 42"
+parseContentOrFail :: String -> String -> Either FmlError Ast.ParsedProgram
+parseContentOrFail filename content = result where
+  r = parseContent filename content
+  result = case r of
+    Left err -> Left $ ParseError $ show err
+    Right ast -> Right ast
