@@ -59,5 +59,5 @@ toParsedInfixExpr op parseInfo lhs = InfixExpr parseInfo lhs op
 toParsedPrefixExpr :: PrefixOp -> ParseInfo -> ParsedExpr -> ParsedExpr
 toParsedPrefixExpr op parseInfo = PrefixExpr parseInfo op
 
-data InfixOp = InfixAdd | InfixSub | InfixMult | InfixDiv | InfixMod | InfixEq | InfixNeq | InfixLt | InfixGt | InfixLe | InfixGe | InfixAnd | InfixOr deriving (Show)
-data PrefixOp = OpNeg | OpNot deriving (Show)
+data InfixOp = InfixAdd | InfixSub | InfixMult | InfixDiv | InfixMod | InfixEq | InfixNeq | InfixLt | InfixGt | InfixLe | InfixGe | InfixAnd | InfixOr deriving (Show, Eq)
+data PrefixOp = OpNeg | OpNot deriving (Show, Eq)

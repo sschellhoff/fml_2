@@ -4,7 +4,7 @@ import Ast
 import FmlError
 import Environment
 import Control.Monad.Trans.Except
-import Control.Monad.State
+import Control.Monad.State ( MonadTrans(lift), State )
 import FmlType
 
 data TypeInfo = TypeInfo
@@ -22,58 +22,58 @@ getExprType :: TypedExpr -> FmlType
 getExprType texpr = typeInfo $ getMetaExpr texpr
 
 addTypeProgramOrFail :: FmlSemanticStep Ast.ParsedProgram TypedProgram
-addTypeProgramOrFail (Ast.FmlCode parseInfi stmts) = do
+addTypeProgramOrFail (Ast.FmlCode info stmts) = do
     tStmts <- addTypesOrFail stmts
-    return $ Ast.FmlCode (TypeInfo Unit parseInfi) tStmts
+    return $ Ast.FmlCode (TypeInfo Unit info) tStmts
 
 addTypesOrFail :: FmlSemanticStep [Ast.ParsedAst] [TypedAst]
 addTypesOrFail = mapM addTypeAstOrFail
 
 addTypeAstOrFail :: FmlSemanticStep Ast.ParsedAst TypedAst
-addTypeAstOrFail (Ast.ConstDecl parseInfi name expr) = do
+addTypeAstOrFail (Ast.ConstDecl info name expr) = do
     texpr <- addTypeExprOrFail expr
     let t = getExprType texpr
     lift $ setInEnv name t
-    return $ Ast.ConstDecl (TypeInfo t parseInfi) name texpr where
-addTypeAstOrFail (Ast.Let parseInfi name expr) = do
+    return $ Ast.ConstDecl (TypeInfo t info) name texpr where
+addTypeAstOrFail (Ast.Let info name expr) = do
     texpr <- addTypeExprOrFail expr
     let t = getExprType texpr
     lift $ setInEnv name t
-    return $ Ast.Let (TypeInfo t parseInfi) name texpr
-addTypeAstOrFail (Ast.Assign parseInfi name expr) = do
+    return $ Ast.Let (TypeInfo t info) name texpr
+addTypeAstOrFail (Ast.Assign info name expr) = do
     texpr <- addTypeExprOrFail expr
     let t = getExprType texpr
-    return $ Ast.Assign (TypeInfo t parseInfi) name texpr
-addTypeAstOrFail (Ast.While parseInfi condition block) = do
+    return $ Ast.Assign (TypeInfo t info) name texpr
+addTypeAstOrFail (Ast.While info condition block) = do
     tcondition <- addTypeExprOrFail condition
     tblock <- mapM addTypeAstOrFail block
     let t = Unit
-    return $ Ast.While (TypeInfo t parseInfi) tcondition tblock
-addTypeAstOrFail (Ast.ExprStmt parseInfi expr) = do
+    return $ Ast.While (TypeInfo t info) tcondition tblock
+addTypeAstOrFail (Ast.ExprStmt info expr) = do
     texpr <- addTypeExprOrFail expr
     let t = Unit
-    return $ Ast.ExprStmt (TypeInfo t parseInfi) texpr
+    return $ Ast.ExprStmt (TypeInfo t info) texpr
 
 addTypeExprOrFail :: FmlSemanticStep Ast.ParsedExpr TypedExpr
-addTypeExprOrFail (Ast.IntConst parseInfi value) = do
-    return $ Ast.IntConst (TypeInfo (Primitive FmlInt64) parseInfi) value
-addTypeExprOrFail (Ast.BoolConst parseInfi value) = do
-    return $ Ast.BoolConst (TypeInfo (Primitive FmlBoolean) parseInfi) value
-addTypeExprOrFail (Ast.FloatConst parseInfi value) = do
-    return $ Ast.FloatConst (TypeInfo (Primitive FmlFloat64) parseInfi) value
-addTypeExprOrFail (Ast.PrefixExpr _ op rhs) = do
+addTypeExprOrFail (Ast.IntConst info value) = do
+    return $ Ast.IntConst (TypeInfo (Primitive FmlInt64) info) value
+addTypeExprOrFail (Ast.BoolConst info value) = do
+    return $ Ast.BoolConst (TypeInfo (Primitive FmlBoolean) info) value
+addTypeExprOrFail (Ast.FloatConst info value) = do
+    return $ Ast.FloatConst (TypeInfo (Primitive FmlFloat64) info) value
+addTypeExprOrFail (Ast.PrefixExpr info op rhs) = do
     trhs <- addTypeExprOrFail rhs
-    let t = getMetaExpr trhs
-    return $ Ast.PrefixExpr t op trhs
-addTypeExprOrFail (Ast.Var parseInfi name) = do
-    t <- getInEnvOrFail name (FmlError.VarNotDef name parseInfi)
-    return $ Ast.Var (TypeInfo t parseInfi) name
-addTypeExprOrFail (Ast.InfixExpr parseInfi lhs op rhs) = do
+    let t = typeInfo $ getMetaExpr trhs
+    return $ Ast.PrefixExpr (TypeInfo t info) op trhs
+addTypeExprOrFail (Ast.Var info name) = do
+    t <- getInEnvOrFail name (FmlError.VarNotDef name info)
+    return $ Ast.Var (TypeInfo t info) name
+addTypeExprOrFail (Ast.InfixExpr info lhs op rhs) = do
     tlhs <- addTypeExprOrFail lhs
     trhs <- addTypeExprOrFail rhs
     let typeOfLhs = getExprType tlhs
     let t = getInfixOpType typeOfLhs op
-    return $ Ast.InfixExpr (TypeInfo t parseInfi) tlhs op trhs
+    return $ Ast.InfixExpr (TypeInfo t info) tlhs op trhs
 
 getInfixOpType :: FmlType -> InfixOp -> FmlType
 getInfixOpType operandType op = case op of
