@@ -18,6 +18,7 @@ const char* debugOpcode(OpCode opcode) {
         case OpCode::OP_JUMP: return "JUMP";
         case OpCode::OP_JUMPF: return "JUMPF";
         case OpCode::OP_MOVE: return "MOVE";
+        case OpCode::OP_LOADC: return "LOADC";
         case OpCode::OP_AND: return "AND";
         case OpCode::OP_OR: return "OR";
         case OpCode::OP_EQ: return "EQ";

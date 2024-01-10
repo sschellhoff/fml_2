@@ -46,6 +46,9 @@ ProgramResult VM::run() {
                 chunk->registers[getParam1(instruction)] = neg(chunk->registers[getParam2(instruction)]);
             break;
             case OpCode::OP_MOVE:
+                chunk->registers[getParam1(instruction)] = chunk->registers[getParam2(instruction)];
+            break;
+            case OpCode::OP_LOADC:
                 chunk->registers[getParam1(instruction)] = chunk->constants[getParam2(instruction)];
             break;
             case OpCode::OP_JUMP:
