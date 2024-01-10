@@ -10,4 +10,5 @@ data FmlError = VarNotDef String Ast.ParseInfo
             | PrefixOperandMismatch PrefixOp FmlType.FmlType Ast.ParseInfo
             | AssignmentTypeMismatch FmlType.FmlType FmlType.FmlType Ast.ParseInfo
             | InvalidConditionType FmlType.FmlType Ast.ParseInfo
+            | IllegaStatePop Ast.ParseInfo
     deriving (Show)

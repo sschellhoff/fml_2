@@ -16,7 +16,7 @@ data TypeInfo = TypeInfo
 type TypedProgram = Ast.Program TypeInfo
 type TypedAst = Ast.Ast TypeInfo
 type TypedExpr = Ast.Expr TypeInfo
-type FmlSemanticStep f t = f -> ExceptT FmlError (State Environment) t
+type FmlSemanticStep f t = f -> ExceptT FmlError (State Environment) t -- TODO rename this
 
 getExprType :: TypedExpr -> FmlType
 getExprType texpr = typeInfo $ getMetaExpr texpr

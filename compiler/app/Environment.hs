@@ -49,7 +49,17 @@ push = do
     env <- get
     let newTop = stackTop env + 1
     put $ env {stackTop = newTop}
-    return newTop
+    return $ newTop + Map.size (registers env)
+
+pop :: Int -> err -> ExceptT err (State Environment) ()
+pop addr err = do
+    env <- get
+    let newTop = stackTop env - 1
+    if addr < Map.size (registers env)
+        then return () -- do nothing if addr is register
+        else if newTop < 0
+        then ExceptT $ return $ Left err
+        else put $ env {stackTop = newTop}
 
 getLabel :: State Environment Int
 getLabel = do
@@ -72,7 +82,7 @@ addConstant c = do -- TODO you can do better ;)
         Nothing -> newIndex where
             newIndex = do
                 put $ env {constants = Map.insert c (Map.size (constants env)) (constants env)}
-                return $ Map.size (constants env) - 1
+                return $ Map.size (constants env) -- 1
 
 getRegister :: String -> (State Environment) (Maybe Int)
 getRegister name = do
