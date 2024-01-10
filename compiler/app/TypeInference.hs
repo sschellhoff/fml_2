@@ -34,7 +34,7 @@ addTypeAstOrFail (Ast.ConstDecl info name expr) = do
     texpr <- addTypeExprOrFail expr
     let t = getExprType texpr
     lift $ setInEnv name t
-    return $ Ast.ConstDecl (TypeInfo t info) name texpr where
+    return $ Ast.ConstDecl (TypeInfo t info) name texpr
 addTypeAstOrFail (Ast.Let info name expr) = do
     texpr <- addTypeExprOrFail expr
     let t = getExprType texpr
