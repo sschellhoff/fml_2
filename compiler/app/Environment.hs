@@ -5,6 +5,8 @@ import Control.Monad.State
 import Control.Monad.Trans.Except
 import FmlType (FmlType)
 import FmlConstant (FmlConstant)
+import qualified Data.List as List
+import Data.Function (on)
 
 data Environment = Environment
     { envTypes :: Map.Map String FmlType
@@ -12,13 +14,14 @@ data Environment = Environment
     , numLabels :: Int
     , constants :: Map.Map FmlConstant Int
     , stackTop :: Int
+    , maxStackTop :: Int
     }
     deriving (Show)
 
 data EnvironmentError = NotDefinedInEnv String | AlreadyDefinedInEnv String FmlType
 
 emptyEnv :: Environment
-emptyEnv = Environment Map.empty Map.empty 0 Map.empty 0
+emptyEnv = Environment Map.empty Map.empty 0 Map.empty 0 0
 
 getInEnv :: String -> (State Environment) (Maybe FmlType)
 getInEnv name = do
@@ -48,7 +51,8 @@ push :: State Environment Int
 push = do
     env <- get
     let newTop = stackTop env + 1
-    put $ env {stackTop = newTop}
+    let newMaxStackTop = max (maxStackTop env) newTop
+    put $ env {stackTop = newTop, maxStackTop = newMaxStackTop}
     return $ newTop + Map.size (registers env)
 
 pop :: Int -> err -> ExceptT err (State Environment) ()
@@ -96,3 +100,15 @@ getRegisterOrFail name err = do
     ExceptT $ return $ case r of
         Nothing -> Left err
         Just _r -> Right _r
+
+numberOfUsedRegisters :: State Environment Int
+numberOfUsedRegisters = do
+    env <- get
+    let _numberOfUsedRegisters = Map.size (constants env)
+    let stackMax = maxStackTop env
+    return $ _numberOfUsedRegisters + stackMax
+
+getConstants :: State Environment [FmlConstant]
+getConstants = do
+    env <- get
+    return $ map fst $ List.sortBy (compare `on` snd) $ Map.toAscList (constants env)

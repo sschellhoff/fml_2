@@ -3,7 +3,7 @@ import qualified Ast
 import TypeInference (FmlSemanticStep, TypeInfo (parseInfo))
 import qualified TypeInference
 import qualified Environment
-import qualified FmlConstant
+import FmlConstant (FmlConstant (ConstFloat64, ConstBool, ConstInt64))
 import Control.Monad.State ( MonadTrans(lift))
 import qualified FmlError
 
@@ -24,30 +24,42 @@ data OpCode = LABEL String
             | OP_JUMPF String Int
             | OP_MOVE Int Int
             | OP_LOADC Int Int
+            | OP_RESERVE Int
             deriving (Show)
 
-newtype ByteCode = ByteCode { -- TODO add constants at the end of generateCodeProgram
-    code :: [OpCode]
-}
+data ByteCode = ByteCode
+    { code :: [OpCode]
+    , constants :: [FmlConstant]
+    }
 
 instance Show ByteCode where
-    show (ByteCode _code) = unlines $ map show _code
+    show (ByteCode _code _constants) = "data:\n" ++ showConstants _constants ++ "\ncode:\n" ++ showCode _code
+
+showConstants :: [FmlConstant] -> String
+showConstants _constants = unlines $ map show _constants
+
+showCode :: [OpCode] -> String
+showCode _code = unlines $ map show _code
 
 noByteCode :: ByteCode
-noByteCode = ByteCode []
+noByteCode = ByteCode [] []
 
 toByteCode :: OpCode -> ByteCode
-toByteCode opCode = ByteCode [opCode]
+toByteCode opCode = ByteCode [opCode] []
 
 appendByteCode :: ByteCode -> ByteCode -> ByteCode
-appendByteCode a b = ByteCode (code a ++ code b)
+appendByteCode a b = ByteCode (code a ++ code b) []
 
 concatByteCode :: [ByteCode] -> ByteCode
-concatByteCode bs = ByteCode $ foldr c [] bs
+concatByteCode bs = ByteCode (foldr c [] bs) []
     where c a b = code a ++ b
 
-generateCodeProgram :: FmlSemanticStep TypeInference.TypedProgram ByteCode -- TODO add constants to bytecode, add reserve registers operation at start, store max registers in environment
-generateCodeProgram (Ast.FmlCode _ stmts) = do generateStmts stmts
+generateCodeProgram :: FmlSemanticStep TypeInference.TypedProgram ByteCode -- TODO add constants to bytecode
+generateCodeProgram (Ast.FmlCode _ stmts) = do
+    _stmts <- generateStmts stmts
+    numberOfRegisters <- lift Environment.numberOfUsedRegisters
+    _constants <- lift Environment.getConstants
+    return $ (appendByteCode (toByteCode $ OP_RESERVE numberOfRegisters) _stmts) { constants = _constants}
 
 generateStmts :: FmlSemanticStep [TypeInference.TypedAst] ByteCode
 generateStmts stmts = do
@@ -58,23 +70,23 @@ generateCodeAst :: FmlSemanticStep TypeInference.TypedAst ByteCode
 generateCodeAst (Ast.ConstDecl info name expr) = do
     varSlot <- Environment.getRegisterOrFail name (FmlError.VarNotDef name $ parseInfo info)
     (stackTop, _expr) <- generateCodeExpr expr
-    _ <- Environment.pop stackTop $ FmlError.IllegaStatePop $ parseInfo info
+    _ <- Environment.pop stackTop $ FmlError.IllegalStatePop $ parseInfo info
     return $ appendByteCode _expr (toByteCode $ OP_MOVE varSlot stackTop)
 generateCodeAst (Ast.Let info name expr) = do
     varSlot <- Environment.getRegisterOrFail name (FmlError.VarNotDef name $ parseInfo info)
     (stackTop, _expr) <- generateCodeExpr expr
-    _ <- Environment.pop stackTop $ FmlError.IllegaStatePop $ parseInfo info
-    return $ appendByteCode _expr (toByteCode $ OP_MOVE varSlot stackTop)   
+    _ <- Environment.pop stackTop $ FmlError.IllegalStatePop $ parseInfo info
+    return $ appendByteCode _expr (toByteCode $ OP_MOVE varSlot stackTop)
 generateCodeAst (Ast.Assign info name expr) = do
     varSlot <- Environment.getRegisterOrFail name (FmlError.VarNotDef name $ parseInfo info)
     (stackTop, _expr) <- generateCodeExpr expr
-    _ <- Environment.pop stackTop $ FmlError.IllegaStatePop $ parseInfo info
-    return $ appendByteCode _expr (toByteCode $ OP_MOVE varSlot stackTop) 
+    _ <- Environment.pop stackTop $ FmlError.IllegalStatePop $ parseInfo info
+    return $ appendByteCode _expr (toByteCode $ OP_MOVE varSlot stackTop)
 generateCodeAst (Ast.While info condition block) = do
     label0 <- lift Environment.getLabelName
     label1 <- lift Environment.getLabelName
     (stackTop, _cond) <- generateCodeExpr condition
-    _ <- Environment.pop stackTop $ FmlError.IllegaStatePop $ parseInfo info
+    _ <- Environment.pop stackTop $ FmlError.IllegalStatePop $ parseInfo info
     _block <- generateStmts block
     return $ concatByteCode [ toByteCode $ LABEL label0
                             , _cond
@@ -84,13 +96,9 @@ generateCodeAst (Ast.While info condition block) = do
                             , toByteCode $ LABEL label1 ]
 generateCodeAst (Ast.ExprStmt info expr) = do
     (stackTop, _expr) <- generateCodeExpr expr
-    _ <- Environment.pop stackTop $ FmlError.IllegaStatePop $ parseInfo info
+    _ <- Environment.pop stackTop $ FmlError.IllegalStatePop $ parseInfo info
     return _expr
 
--- TODO register reusage is broken, a + 2 will currently use the register of a to place the result.
--- 1 + b can reuse the LHS register
--- a + 2 can reuse the RHS register
--- a + b cannot reuse any register
 generateCodeExpr :: FmlSemanticStep TypeInference.TypedExpr (Int, ByteCode)
 generateCodeExpr (Ast.IntConst _ value) = do
     constSlot <- lift $ Environment.addConstant $ FmlConstant.ConstInt64 value
@@ -104,8 +112,10 @@ generateCodeExpr (Ast.FloatConst _ value) = do
     constSlot <- lift $ Environment.addConstant $ FmlConstant.ConstFloat64 value
     stackTop <- lift Environment.push
     return (stackTop, toByteCode (OP_LOADC stackTop constSlot))
-generateCodeExpr (Ast.PrefixExpr _ op rhs) = do
-    (stackTop, _rhs) <- generateCodeExpr rhs
+generateCodeExpr (Ast.PrefixExpr info op rhs) = do
+    (stackTopRight, _rhs) <- generateCodeExpr rhs
+    _ <- Environment.pop stackTopRight $ FmlError.IllegalStatePop $ parseInfo info
+    stackTop <- lift Environment.push
     let _op = toByteCode $ case op of
             Ast.OpNeg -> OP_NEG stackTop stackTop
             Ast.OpNot -> OP_NEG stackTop stackTop
@@ -116,19 +126,21 @@ generateCodeExpr (Ast.Var info name) = do
 generateCodeExpr (Ast.InfixExpr info lhs op rhs) = do
     (stackTopLeft, _lhs) <- generateCodeExpr lhs
     (stackTopRight, _rhs) <- generateCodeExpr rhs
-    _ <- Environment.pop stackTopRight $ FmlError.IllegaStatePop $ parseInfo info
+    _ <- Environment.pop stackTopLeft $ FmlError.IllegalStatePop $ parseInfo info
+    _ <- Environment.pop stackTopRight $ FmlError.IllegalStatePop $ parseInfo info
+    stackTop <- lift Environment.push
     let _op = case op of
-            Ast.InfixAdd -> toByteCode $ OP_ADD stackTopLeft stackTopLeft stackTopRight
-            Ast.InfixSub -> toByteCode $ OP_SUB stackTopLeft stackTopLeft stackTopRight
-            Ast.InfixMult -> toByteCode $ OP_MULT stackTopLeft stackTopLeft stackTopRight
-            Ast.InfixDiv -> toByteCode $ OP_DIV stackTopLeft stackTopLeft stackTopRight
-            Ast.InfixMod -> toByteCode $ OP_MOD stackTopLeft stackTopLeft stackTopRight
-            Ast.InfixEq -> toByteCode $ OP_EQ stackTopLeft stackTopLeft stackTopRight
-            Ast.InfixNeq -> appendByteCode (toByteCode $ OP_EQ stackTopLeft stackTopLeft stackTopRight) (toByteCode $ OP_NEG stackTopLeft stackTopLeft)
-            Ast.InfixLt -> toByteCode $ OP_LT stackTopLeft stackTopLeft stackTopRight
-            Ast.InfixGt -> toByteCode $ OP_GT stackTopLeft stackTopLeft stackTopRight
-            Ast.InfixLe -> appendByteCode (toByteCode $ OP_GT stackTopLeft stackTopLeft stackTopRight) (toByteCode $ OP_NEG stackTopLeft stackTopLeft)
-            Ast.InfixGe -> appendByteCode (toByteCode $ OP_LT stackTopLeft stackTopLeft stackTopRight) (toByteCode $ OP_NEG stackTopLeft stackTopLeft)
-            Ast.InfixAnd -> toByteCode $ OP_AND stackTopLeft stackTopLeft stackTopRight
-            Ast.InfixOr -> toByteCode $ OP_OR stackTopLeft stackTopLeft stackTopRight
-    return (stackTopLeft, appendByteCode _lhs (appendByteCode _rhs _op))
+            Ast.InfixAdd -> toByteCode $ OP_ADD stackTop stackTopLeft stackTopRight
+            Ast.InfixSub -> toByteCode $ OP_SUB stackTop stackTopLeft stackTopRight
+            Ast.InfixMult -> toByteCode $ OP_MULT stackTop stackTopLeft stackTopRight
+            Ast.InfixDiv -> toByteCode $ OP_DIV stackTop stackTopLeft stackTopRight
+            Ast.InfixMod -> toByteCode $ OP_MOD stackTop stackTopLeft stackTopRight
+            Ast.InfixEq -> toByteCode $ OP_EQ stackTop stackTopLeft stackTopRight
+            Ast.InfixNeq -> appendByteCode (toByteCode $ OP_EQ stackTop stackTopLeft stackTopRight) (toByteCode $ OP_NEG stackTop stackTop)
+            Ast.InfixLt -> toByteCode $ OP_LT stackTop stackTopLeft stackTopRight
+            Ast.InfixGt -> toByteCode $ OP_GT stackTop stackTopLeft stackTopRight
+            Ast.InfixLe -> appendByteCode (toByteCode $ OP_GT stackTop stackTopLeft stackTopRight) (toByteCode $ OP_NEG stackTop stackTop)
+            Ast.InfixGe -> appendByteCode (toByteCode $ OP_LT stackTop stackTopLeft stackTopRight) (toByteCode $ OP_NEG stackTop stackTop)
+            Ast.InfixAnd -> toByteCode $ OP_AND stackTop stackTopLeft stackTopRight
+            Ast.InfixOr -> toByteCode $ OP_OR stackTop stackTopLeft stackTopRight
+    return (stackTop, appendByteCode _lhs (appendByteCode _rhs _op))
