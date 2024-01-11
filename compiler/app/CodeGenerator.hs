@@ -25,7 +25,26 @@ data OpCode = LABEL String
             | OP_MOVE Int Int
             | OP_LOADC Int Int
             | OP_RESERVE Int
-            deriving (Show)
+
+instance Show OpCode where
+    show (LABEL l) = l ++ ":"
+    show OP_RETURN = "\tRETURN"
+    show (OP_ADD t a b) = "\tADD " ++ show t ++  " " ++ show a ++ " " ++ show b
+    show (OP_SUB t a b) = "\tSUB " ++ show t ++  " " ++ show a ++ " " ++ show b
+    show (OP_MULT t a b) = "\tMULT " ++ show t ++  " " ++ show a ++ " " ++ show b
+    show (OP_DIV t a b) = "\tDIV " ++ show t ++  " " ++ show a ++ " " ++ show b
+    show (OP_MOD t a b) = "\tMOD " ++ show t ++  " " ++ show a ++ " " ++ show b
+    show (OP_AND t a b) = "\tAND " ++ show t ++  " " ++ show a ++ " " ++ show b
+    show (OP_OR t a b) = "\tOR " ++ show t ++  " " ++ show a ++ " " ++ show b
+    show (OP_EQ t a b) = "\tEQ " ++ show t ++  " " ++ show a ++ " " ++ show b
+    show (OP_LT t a b) = "\tLT " ++ show t ++  " " ++ show a ++ " " ++ show b
+    show (OP_GT t a b) = "\tGT " ++ show t ++  " " ++ show a ++ " " ++ show b
+    show (OP_NEG t s) = "\tNEG " ++ show t ++  " " ++ show s
+    show (OP_JUMP l) = "\tJUMP " ++ l
+    show (OP_JUMPF l s) = "\tJUMPF " ++ l ++  " " ++ show s
+    show (OP_MOVE t s) = "\tMOVE " ++ show t ++  " " ++ show s
+    show (OP_LOADC t s) = "\tLOADC " ++ show t ++  " " ++ show s
+    show (OP_RESERVE n) = "\tRESERVE " ++ show n
 
 data ByteCode = ByteCode
     { code :: [OpCode]
@@ -59,7 +78,7 @@ generateCodeProgram (Ast.FmlCode _ stmts) = do
     _stmts <- generateStmts stmts
     numberOfRegisters <- lift Environment.numberOfUsedRegisters
     _constants <- lift Environment.getConstants
-    return $ (appendByteCode (toByteCode $ OP_RESERVE numberOfRegisters) _stmts) { constants = _constants}
+    return $ (appendByteCode (toByteCode $ OP_RESERVE numberOfRegisters) $ appendByteCode _stmts $ toByteCode OP_RETURN) { constants = _constants}
 
 generateStmts :: FmlSemanticStep [TypeInference.TypedAst] ByteCode
 generateStmts stmts = do
