@@ -14,11 +14,11 @@ runFileOrFail :: String -> IO (Either FmlError.FmlError (Either FmlError.FmlErro
 runFileOrFail filename = do
     compile filename <$> readFile filename
 
+-- TODO return early on first error to result in a singl either
 compile :: String -> String -> Either FmlError.FmlError (Either FmlError.FmlError ByteCode)
 compile filename content = do
     ast <- FMLParser.parseContentOrFail filename content
-    let s = evalState (runExceptT (transformAst ast)) Environment.emptyEnv
-    return s
+    return $ evalState (runExceptT (transformAst ast)) Environment.emptyEnv
 
 transformAst ::FmlSemanticStep Ast.ParsedProgram ByteCode
 transformAst ast = do
