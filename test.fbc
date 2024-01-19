@@ -1,0 +1,23 @@
+data:
+        i64 1
+        i64 5
+        i64 0
+
+code:
+        RESERVE 3
+        LOADC 2 0
+        MOVE 0 2
+        LOADC 2 1
+        MOVE 1 2
+LABEL_1:
+        LOADC 2 2
+        GT 2 1 2
+        JUMPF LABEL_2 2
+        MULT 2 0 1
+        MOVE 0 2
+        LOADC 2 0
+        SUB 2 1 2
+        MOVE 1 2
+        JUMP LABEL_1
+LABEL_2:
+        RETURN

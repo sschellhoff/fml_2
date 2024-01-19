@@ -1,0 +1,12 @@
+let fib = 1
+let prevFib = 1
+
+const n = 7
+
+let i = 2
+while i < n {
+    const temp = fib
+    fib = fib + prevFib
+    prevFib = temp
+    i = i + 1
+}

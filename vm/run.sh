@@ -1,1 +1,1 @@
-./build.sh && ./build/vm
+./build.sh && ./build/vm ../fibonacci.fbc

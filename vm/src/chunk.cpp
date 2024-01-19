@@ -64,6 +64,15 @@ void Chunk::write(OpCode opcode, uint16_t param1, uint16_t param2, uint16_t para
     code.push_back(shiftOpcode(opcode) | shiftParam1(param1) | shiftParam2(param2) | shiftParam3(param3));
 }
 
+void Chunk::writeParam1(size_t instructionPosition, uint16_t param) {
+    uint64_t instruction = this->code[instructionPosition];
+    auto opcode = getOpcode(instruction);
+    auto param1 = param;
+    auto param2 = getParam2(instruction);
+    auto param3 = getParam3(instruction);
+    this->code[instructionPosition] = shiftOpcode(opcode) | shiftParam1(param1) | shiftParam2(param2) | shiftParam3(param3);
+ }
+
 void Chunk::debug() {
     std::cout << "======== Chunk ========" << std::endl;
     std::cout << "*** Constants ***" << std::endl;

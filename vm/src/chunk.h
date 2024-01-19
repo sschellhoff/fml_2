@@ -14,6 +14,7 @@ public:
     void write(OpCode opcode, uint16_t param1);
     void write(OpCode opcode, uint16_t param1, uint16_t param2);
     void write(OpCode opcode, uint16_t param1, uint16_t param2, uint16_t param3);
+    void writeParam1(size_t instructionPosition, uint16_t param);
 
     void debug();
 };

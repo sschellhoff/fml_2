@@ -73,7 +73,7 @@ concatByteCode :: [ByteCode] -> ByteCode
 concatByteCode bs = ByteCode (foldr c [] bs) []
     where c a b = code a ++ b
 
-generateCodeProgram :: FmlSemanticStep TypeInference.TypedProgram ByteCode -- TODO add constants to bytecode
+generateCodeProgram :: FmlSemanticStep TypeInference.TypedProgram ByteCode
 generateCodeProgram (Ast.FmlCode _ stmts) = do
     _stmts <- generateStmts stmts
     numberOfRegisters <- lift Environment.numberOfUsedRegisters

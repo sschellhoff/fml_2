@@ -1,5 +1,6 @@
 #include "vm.h"
 #include <assert.h>
+#include <iostream>
 
 ProgramResult VM::interpret(Chunk* chunk) {
     this->chunk = chunk;
@@ -65,6 +66,12 @@ ProgramResult VM::run() {
             break;
             case OpCode::OP_RETURN:
                 return ProgramResult::PROG_OK;
+            break;
+
+            case OpCode::OP_RESERVE: {
+                auto amount = getParam1(instruction);
+                chunk->registers.resize(amount);
+            }
             break;
         }
     }

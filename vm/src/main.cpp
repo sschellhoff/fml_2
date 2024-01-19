@@ -1,25 +1,29 @@
 #include "chunk.h"
 #include "vm.h"
+#include "source.h"
+#include "scanner.h"
+#include "assembler.h"
 #include <iostream>
+#include <fstream>
 
 int main(int argc, const char* argv[]) {
-	Chunk chunk;
-	chunk.constants.push_back(getInt64(0));
-	chunk.constants.push_back(getInt64(1));
-	chunk.constants.push_back(getInt64(5));
-	chunk.registers.resize(3, getUnit());
+	if (argc != 2) {
+		std::cout << "Expected one filename as parameter" << std::endl;
+		exit(1);
+	}
+	std::ifstream file(argv[1]);
+	if (!file.is_open()) {
+		std::cout << "Could not open file " << argv[1] << std::endl;
+		exit(1);
+	}
 
-	// TODO rewrite
-	chunk.write(OpCode::OP_LOADC, 0, 1);
-	chunk.write(OpCode::OP_LOADC, 1, 2);
-	chunk.write(OpCode::OP_LOADC, 2, 0);
-	chunk.write(OpCode::OP_GT, 2, 1, 2);
-	chunk.write(OpCode::OP_JUMPF, 9, 2);
-	chunk.write(OpCode::OP_MULT, 0, 0, 1);
-	chunk.write(OpCode::OP_LOADC, 2, 1);
-	chunk.write(OpCode::OP_SUB, 1, 1, 2);
-	chunk.write(OpCode::OP_JUMP, 2);
-	chunk.write(OpCode::OP_RETURN);
+	Chunk chunk;
+
+	Source source(file);
+	Scanner scanner(source);
+	Assembler assembler(scanner, chunk);
+	assembler.parse();
+	file.close();
 
 	chunk.debug();
 	VM vm;

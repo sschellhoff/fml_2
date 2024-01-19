@@ -53,7 +53,7 @@ push = do
     let newTop = stackTop env + 1
     let newMaxStackTop = max (maxStackTop env) newTop
     put $ env {stackTop = newTop, maxStackTop = newMaxStackTop}
-    return $ newTop + Map.size (registers env)
+    return $ newTop + Map.size (registers env) - 1
 
 pop :: Int -> err -> ExceptT err (State Environment) ()
 pop addr err = do
@@ -104,7 +104,7 @@ getRegisterOrFail name err = do
 numberOfUsedRegisters :: State Environment Int
 numberOfUsedRegisters = do
     env <- get
-    let _numberOfUsedRegisters = Map.size (constants env)
+    let _numberOfUsedRegisters = Map.size (registers env)
     let stackMax = maxStackTop env
     return $ _numberOfUsedRegisters + stackMax
 

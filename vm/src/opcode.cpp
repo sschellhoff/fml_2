@@ -9,6 +9,7 @@ uint64_t asNum(OpCode opcode, uint8_t bytesToShift) {
 const char* debugOpcode(OpCode opcode) {
     switch(opcode) {
         case OpCode::OP_RETURN: return "RETURN";
+        case OpCode::OP_RESERVE: return "RESERVE";
         case OpCode::OP_ADD: return "ADD";
         case OpCode::OP_SUB: return "SUB";
         case OpCode::OP_MULT: return "MULT";

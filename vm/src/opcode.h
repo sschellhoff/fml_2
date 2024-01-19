@@ -17,7 +17,8 @@ enum class OpCode {
     OP_JUMP,
     OP_JUMPF,
     OP_MOVE,
-    OP_LOADC
+    OP_LOADC,
+    OP_RESERVE
 };
 
 uint64_t asNum(OpCode opcode, uint8_t bytesToShift);
