@@ -23,7 +23,9 @@ data Ast meta
     | Let meta String (Expr meta)
     | Assign meta String (Expr meta)
     | While meta (Expr meta) (Stmts meta)
+    | If meta (Expr meta) (Stmts meta)
     | ExprStmt meta (Expr meta)
+    | ReturnStmt meta
     deriving (Show)
 
 data Expr meta
@@ -43,7 +45,9 @@ getMetaAst (ConstDecl m _ _) = m
 getMetaAst (Let m _ _) = m
 getMetaAst (Assign m _ _) = m
 getMetaAst (While m _ _) = m
+getMetaAst (If m _ _) = m
 getMetaAst (ExprStmt m _) = m
+getMetaAst (ReturnStmt m) = m
 
 getMetaExpr :: Expr meta -> meta
 getMetaExpr (IntConst m _) = m

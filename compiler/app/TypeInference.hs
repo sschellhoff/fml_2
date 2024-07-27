@@ -49,10 +49,18 @@ addTypeAstOrFail (Ast.While info condition block) = do
     tblock <- mapM addTypeAstOrFail block
     let t = Unit
     return $ Ast.While (TypeInfo t info) tcondition tblock
+addTypeAstOrFail (Ast.If info condition block) = do
+    tcondition <- addTypeExprOrFail condition
+    tblock <- mapM addTypeAstOrFail block
+    let t = Unit
+    return $ Ast.If (TypeInfo t info) tcondition tblock
 addTypeAstOrFail (Ast.ExprStmt info expr) = do
     texpr <- addTypeExprOrFail expr
     let t = Unit
     return $ Ast.ExprStmt (TypeInfo t info) texpr
+addTypeAstOrFail (Ast.ReturnStmt info) = do
+    let t = Unit
+    return $ Ast.ReturnStmt (TypeInfo t info)
 
 addTypeExprOrFail :: FmlSemanticStep Ast.ParsedExpr TypedExpr
 addTypeExprOrFail (Ast.IntConst info value) = do

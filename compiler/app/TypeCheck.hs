@@ -52,11 +52,25 @@ typeCheckAstOrFail (Ast.While info condition block) = do
     ExceptT $ return $ if actualType == Unit
         then Right $ Ast.While info _condition _block
         else Left $ TypeMismatch Unit actualType (parseInfo info)  
+typeCheckAstOrFail (Ast.If info condition block) = do
+    _condition <- typeCheckExprkOrFail condition
+    let conditionType = typeInfo $ getMetaExpr _condition
+    _block <- mapM typeCheckAstOrFail block
+    let actualType = typeInfo info
+    _ <- typeCheckCondition conditionType info
+    ExceptT $ return $ if actualType == Unit
+        then Right $ Ast.If info _condition _block
+        else Left $ TypeMismatch Unit actualType (parseInfo info)  
 typeCheckAstOrFail (Ast.ExprStmt info expr) = do
     _expr <- typeCheckExprkOrFail expr
     let actualType = typeInfo info
     ExceptT $ return $ if actualType == Unit
         then Right $ Ast.ExprStmt info _expr
+        else Left $ TypeMismatch Unit actualType (parseInfo info)  
+typeCheckAstOrFail (Ast.ReturnStmt info) = do
+    let actualType = typeInfo info
+    ExceptT $ return $ if actualType == Unit
+        then Right $ Ast.ReturnStmt info
         else Left $ TypeMismatch Unit actualType (parseInfo info)  
 
 typeCheckExprkOrFail :: FmlSemanticStep TypedExpr TypedExpr

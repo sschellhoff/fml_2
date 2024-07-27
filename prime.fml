@@ -1,0 +1,20 @@
+let isPrime = true
+const n = 7
+
+if n <= 3 {
+    isPrime = n > 1
+    return
+}
+if n % 2 == 0 || n % 3 == 0 {
+    isPrime = false
+    return
+}
+
+let i = 5
+while i * i <= n {
+    if n % i == 0 || n % (i + 2) == 0 {
+        isPrime = false
+        return
+    }
+    i = i + 6
+}

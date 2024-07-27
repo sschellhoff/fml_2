@@ -9,6 +9,7 @@ import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import qualified Control.Monad.Combinators.Expr as CE
 import FmlError
+import qualified Ast
 
 type Parser = Parsec Void Text
 
@@ -106,10 +107,10 @@ operatorTable =
   , [ binary "+" (Ast.toParsedInfixExpr Ast.InfixAdd (makeParseInfo 0))
     , binary "-" (Ast.toParsedInfixExpr Ast.InfixSub (makeParseInfo 0))
     ]
-  , [ binary "<" (Ast.toParsedInfixExpr Ast.InfixLt (makeParseInfo 0))
+  , [ binary ">=" (Ast.toParsedInfixExpr Ast.InfixGe (makeParseInfo 0)) 
+    , binary "<=" (Ast.toParsedInfixExpr Ast.InfixLe (makeParseInfo 0))
+    , binary "<" (Ast.toParsedInfixExpr Ast.InfixLt (makeParseInfo 0))
     , binary ">" (Ast.toParsedInfixExpr Ast.InfixGt (makeParseInfo 0))   
-    , binary ">=" (Ast.toParsedInfixExpr Ast.InfixGe (makeParseInfo 0)) 
-    , binary "<=" (Ast.toParsedInfixExpr Ast.InfixLe (makeParseInfo 0)) 
     ] 
   , [ binary "==" (Ast.toParsedInfixExpr Ast.InfixEq (makeParseInfo 0))
     , binary "!=" (Ast.toParsedInfixExpr Ast.InfixNeq (makeParseInfo 0))
@@ -126,9 +127,11 @@ parseExpr = CE.makeExprParser parseTerm operatorTable
 parseStmt :: Parser Ast.ParsedAst
 parseStmt = choice
     [ parseWhileStmt
+    , parseIfStmt
     , parseConstStmt
     , try parseAssignStmt
     , parseLetStmt
+    , parseReturnStmt
     , parseExprStmt
     ]
 
@@ -155,6 +158,13 @@ parseLetStmt = do
     _ <- symbol "="
     Ast.ConstDecl (makeParseInfo pos) name <$> parseExpr
 
+
+parseReturnStmt :: Parser Ast.ParsedAst
+parseReturnStmt = do
+    pos <- getOffset
+    _ <- parseKeyword "return"
+    return $ Ast.ReturnStmt (makeParseInfo pos)
+
 parseExprStmt :: Parser Ast.ParsedAst
 parseExprStmt = do
     pos <- getOffset
@@ -172,6 +182,13 @@ parseWhileStmt = do
     _ <- parseKeyword "while"
     condition <- parseExpr
     Ast.While (makeParseInfo pos) condition <$> parseBlock
+
+parseIfStmt :: Parser Ast.ParsedAst
+parseIfStmt = do
+    pos <- getOffset
+    _ <- parseKeyword "if"
+    condition <- parseExpr
+    Ast.If (makeParseInfo pos) condition <$> parseBlock
 
 parseProgram :: String -> Parser Ast.ParsedProgram
 parseProgram filename = Ast.FmlCode (Ast.ParseInfo 0 filename) <$> parseStmts

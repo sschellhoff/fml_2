@@ -1,0 +1,1 @@
+./build.sh && ./dist-newstyle/build/aarch64-osx/ghc-9.4.8/compiler-0.1.0.0/x/compiler/build/compiler/compiler ../prime.fml

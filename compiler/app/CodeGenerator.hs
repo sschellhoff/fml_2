@@ -113,10 +113,21 @@ generateCodeAst (Ast.While info condition block) = do
                             , _block
                             , toByteCode $ OP_JUMP label0
                             , toByteCode $ LABEL label1 ]
+generateCodeAst (Ast.If info condition block) = do
+    label0 <- lift Environment.getLabelName
+    (stackTop, _cond) <- generateCodeExpr condition
+    _ <- Environment.pop stackTop $ FmlError.IllegalStatePop $ parseInfo info
+    _block <- generateStmts block
+    return $ concatByteCode [ _cond
+                            , toByteCode $ OP_JUMPF label0 stackTop
+                            , _block
+                            , toByteCode $ LABEL label0 ]
 generateCodeAst (Ast.ExprStmt info expr) = do
     (stackTop, _expr) <- generateCodeExpr expr
     _ <- Environment.pop stackTop $ FmlError.IllegalStatePop $ parseInfo info
     return _expr
+generateCodeAst (Ast.ReturnStmt info) = do
+    return $ toByteCode OP_RETURN
 
 generateCodeExpr :: FmlSemanticStep TypeInference.TypedExpr (Int, ByteCode)
 generateCodeExpr (Ast.IntConst _ value) = do
