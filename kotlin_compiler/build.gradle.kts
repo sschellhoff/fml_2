@@ -10,6 +10,8 @@ repositories {
 }
 
 dependencies {
+    implementation("org.ow2.asm:asm:7.0")
+    implementation("org.ow2.asm:asm-util:7.0")
     testImplementation(kotlin("test"))
 }
 

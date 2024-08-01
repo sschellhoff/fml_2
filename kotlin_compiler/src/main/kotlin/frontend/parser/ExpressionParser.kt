@@ -10,6 +10,8 @@ import de.sschellhoff.frontend.unexpectedToken
 class ExpressionParser(private val lexer: BufferedLexer) : Parser<Ast.Expression> {
     override fun parse(): Ast.Expression = parseExpression(0)
 
+    override fun isDone(): Boolean = lexer.getNext() is Token.Eof
+
     private fun parseExpression(precedence: Int): Ast.Expression {
         val lhsParser = unaryParser[lexer.peekNext()::class] ?: ::parseAtomic
         var lhs = lhsParser()
